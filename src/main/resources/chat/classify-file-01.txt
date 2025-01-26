@@ -1,0 +1,37 @@
+SYSTEM: Your output must be a valid JSON object with the keys `path` and `filename`.
+
+EXISTING DIRECTORY STRUCTURE:
+```
+[[directory_structure]]
+```
+
+DIRECTORY METADATA:
+```
+[[docfiles]]
+```
+
+EXAMPLE FILES:
+```
+[[example_filenames]]
+```
+
+OCR TEXT (with spelling and other detection errors):
+```
+[[ocr_text]]
+```
+
+SYSTEM:
+Your task is to sort a PDF or TXT file into an existing directory structure.
+These files are generally named "YYYY-MM-DD Filename Keywords.extension".
+You MUST return a JSON object with the properties `path` (relative path to the directory from the base path) and `filename` (see above).
+When determining the path to use and the filename to give, you should:
+1. Analyze the existing file tree and it's structure.
+2. Use the data from the file OCR to learn about the file content, potential path and name, and it's relevant date.
+3. Think about where to write the PDF into the existing directory structure (only create new directories if necessary, really check all previous ones). The path must be concatenated from the directory names split by `/`.
+4. Think about how to name the file based on the content and date.
+5. Return the path and filename as a JSON object in the format `{"path":"path/to/file","filename":"filename.extension"}`.
+If you cannot find the correct date in the file, use the current date: [[current_date]].
+DO NOT INVENT NEW TOP-LEVEL DIRECTORIES, use the existing ones and pick the fitting subdirectories below those: [[top_level_directories]] (subdirectories see above in DIRECTORY STRUCTURE).
+
+EXAMPLE OUTPUT:
+`{"path":"path/to/file","filename":"filename.extension"}`

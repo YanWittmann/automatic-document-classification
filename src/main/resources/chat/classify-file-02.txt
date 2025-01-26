@@ -1,0 +1,35 @@
+{
+  "SYSTEM": "Your output must be a valid JSON object with the keys `path` and `filename`.",
+  "SYSTEM_REPEAT": "RESPONSE MUST BE A JSON OBJECT. This is of vital importance.",
+  "TASK": "Sort a document into an existing directory structure WITHOUT creating new directories unless absolutely unavoidable and return a JSON object.",
+  "OCR_TEXT": "[[ocr_summary]]",
+  "DIRECTORY_METADATA": "[[docfiles]]",
+  "EXISTING_DIRECTORY_STRUCTURE": [[directory_structure]],
+  "FILENAME_RULES": [
+    "Format: `YYYY-MM-DD Filename-Part Descriptive-Keywords.extension`",
+    "Use OCR-detected date or `[[current_date]]` if unavailable",
+    "The Filename-Part should be a concise description of the document content and MUST be written in GERMAN (de-DE)",
+    "The Descriptive-Keywords are the 5-15 most relevant keywords, such as project names, meeting titles, ids, amounts, costs, item names, etc.",
+    "The filename must be this exhaustive to support later search and retrieval based on the keywords",
+    "All parts should not use kebab-case, snake_case, camelCase, or PascalCase, but rather simple space separation",
+  ],
+  "PROCESS": [
+    "Analyze directory structure depth-first",
+    "Analyze OCR_TEXT for content, date, keywords and more",
+    "Cross-reference OCR_TEXT content with directory names (consider typos)",
+    "Identify BEST existing path match using hierarchical relevance. Also consider subdirectories of the top-level directories",
+    "Construct filename using detected/metadata dates and find the best keywords",
+    "Provide your `path` and `filename` as a JSON object"
+  ],
+  "EXAMPLE_RESPONSE": {
+    "path": "existing-top-level/subdirectory/...",
+    "filename": "2024-03-15 Project-Mtg-Notes.pdf"
+  },
+  "EXAMPLE_FAILURE": "BAD: ```json\n{...}\n```\nGOOD: {raw JSON}",
+  "SYSTEM": "ANY ADDITIONAL TEXT BEFORE/AFTER/BETWEEN THE JSON WILL CAUSE SYSTEM FAILURE. Output must begin with '{' and end with '}' with proper escaping.",
+  "WARNINGS": [
+    "STRICTLY: If your response contains ANY non-JSON text/markdown/formatting/commentary, the user's system will crash",
+    "DO NOT: Include explanations, code formatting (```), or null values",
+    "VALIDATION: Before responding, ask yourself: 1) Is this valid JSON? 2) Does it have ONLY `path`/`filename`? 3) No extra characters?"
+  ]
+}
