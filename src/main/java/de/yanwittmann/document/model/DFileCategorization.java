@@ -20,7 +20,7 @@ public class DFileCategorization {
     }
 
     public DFileCategorization cleanFilename() {
-        final String cleanedFilename = filename.replaceAll("[^ a-zA-Z0-9,;:+*#'._€!§$%&()\\[\\]{}-]", "");
+        final String cleanedFilename = filename.replaceAll("[^- a-zA-Z0-9,;:+*#'._€!§$%&()\\[\\]{}öäüÖÄÜß@^~]", "");
         final String path = this.path == null ? "" : this.path.replace("../", "/").replace("//", "/");
         if (cleanedFilename.length() > 255) {
             return new DFileCategorization(path, cleanedFilename.substring(0, 255));

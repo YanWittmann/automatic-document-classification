@@ -8,6 +8,8 @@ Your task is to identify a possible filename for a given file content descriptio
 - The filename must be this exhaustive to support later search and retrieval based on the keywords
 - I can't stress this enough: Product, item, and all other names must be included in the filename. The user must be able to find the file based on any of the most important content of the file.
 - For example, on a receipt, you would include the store name, purchased items, date, and total amount. On a contract, you would include the company name, date, and contract type.
+- Instead of writing `Serial Number`, you would write the actual serial number, e.g., `SH-2022489349`. The same goes for all other details.
+- Do not mention the mere existence of a detail, such as the presence of a QR-Code or Logo. Only include information on the content of these elements.
 - All parts should use simple space separation, NOT kebab-case, snake_case, camelCase, PascalCase or other formats
 
 A couple of GOOD examples:

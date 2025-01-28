@@ -27,7 +27,8 @@ Automatically rename and move documents to a folder structure based on their con
     - Directory structure validation and creation
     - Clean filename generation with special character removal
 
-I achieved processing times of roughly 90-100 seconds per document (tesseract OCR) on my NVIDIA GeForce RTX 3090,
+I achieved processing times of roughly 90-110 (ollama OCR) or 60-80 (tesseract OCR) seconds per document on my NVIDIA
+GeForce RTX 3090,
 using with the `deepseek-r1` model.
 I can't scan and sort my documents physically very much faster than that, so I'm happy with the performance.
 This long processing time comes from the three different steps I split the process into.
@@ -63,7 +64,8 @@ DOCUMENT CLASSIFIER - 1 file - ocr=ollama
 - Java 17+
 - [Maven 3.8+](https://maven.apache.org/download.cgi)
 - [Docker](https://www.docker.com/get-started) (if you use Tesseract OCR)
-- Docker image: [tesseractshadow/tesseract4re](https://hub.docker.com/r/tesseractshadow/tesseract4re/) (if you use Tesseract OCR)
+- Docker image: [tesseractshadow/tesseract4re](https://hub.docker.com/r/tesseractshadow/tesseract4re/) (if you use
+  Tesseract OCR)
 - [Ollama](https://ollama.ai/) or compatible AI API endpoint (OpenAI for example), but I would really recommend going
   for a locally hosted solution, because you usually don't want your documents to be shared with a third party.
   And with the new `deepseek-r1` model, locally hosted AI has reached a competitive level to big tech.
@@ -100,7 +102,10 @@ Then run:
 mvn clean package
 ```
 
-#### Create run scripts, adjust your paths to the jar file
+#### Running the Application
+
+You can either trigger the workflow manually by running the JAR file via a batch/shell script as shown below by then
+dragging your files or entire folders onto the script files:
 
 Windows (`run.bat`):
 
@@ -117,7 +122,11 @@ Linux/Mac (`run.sh`):
 java -jar target/automatic-document-classification-1.0-SNAPSHOT.jar "$@"
 ```
 
-You can then trigger the processing of documents by dragging their files or entire folders onto the script files.
+Or you can launch the application in automatic mode, which continuously scans a directory for new files:
+
+```shell
+java -jar target/automatic-document-classification-1.0-SNAPSHOT.jar -autodetect path/to/scan/dir
+```
 
 ### Adjust behavior
 

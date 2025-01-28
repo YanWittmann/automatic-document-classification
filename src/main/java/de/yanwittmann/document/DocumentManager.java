@@ -42,28 +42,20 @@ public class DocumentManager {
     public static void main(String[] args) throws IOException {
         final DocumentManager documentManager = new DocumentManager();
 
-        final TimeStats totalTime = new TimeStats();
-
         if (args.length == 0) {
             printErrorBox("No files provided");
             return;
         }
 
-        final List<File> files = new ArrayList<>();
-        for (String arg : args) {
-            final File file = new File(arg);
-            if (file.exists()) {
-                if (file.isDirectory()) {
-                    files.addAll(FileUtils.listFiles(file, null, true));
-                } else {
-                    files.add(file);
-                }
-            } else {
-                printErrorBox("File not found: " + arg);
-            }
+        if (args[0].equals("-autodetect")) {
+            documentManager.handleAutoDetectMode(args);
+        } else {
+            documentManager.handleNormalMode(args);
         }
+    }
 
-        System.out.printf(String.format("%s - %s - ocr=%s%n%n", "DOCUMENT CLASSIFIER", files.size() + " file" + (files.size() == 1 ? "" : "s"), Config.Props.OCR_METHOD.get()));
+    private void processFiles(List<File> files) {
+        final TimeStats totalTime = new TimeStats();
 
         for (int i = 0; i < files.size(); i++) {
             final File processFile = files.get(i);
@@ -73,10 +65,10 @@ public class DocumentManager {
             System.out.printf("│ %s%n", processFile.getName());
 
             try {
-                final DFileCategorization categorization = documentManager.categorizeFile(processFile);
+                final DFileCategorization categorization = categorizeFile(processFile);
                 final DFileCategorization finalCategorization = categorization.cleanFilename().retype(processFile.getName());
 
-                documentManager.fileMover.moveFile(processFile, finalCategorization);
+                fileMover.moveFile(processFile, finalCategorization);
                 printStep("Moved file", finalCategorization.toString(), fileTime.stopFormatted());
             } catch (Exception e) {
                 printErrorBox("Processing failed: " + e.getMessage());
@@ -89,6 +81,55 @@ public class DocumentManager {
         printHorizontalLine("┌");
         printStep("Finished classification", files.size() + " file" + (files.size() == 1 ? "" : "s") + " processed", totalTime.stopFormatted());
         printHorizontalLine("└");
+    }
+
+    private void handleNormalMode(String[] args) {
+        List<File> files = new ArrayList<>();
+        for (String arg : args) {
+            File file = new File(arg);
+            if (file.exists()) {
+                if (file.isDirectory()) {
+                    files.addAll(FileUtils.listFiles(file, null, true));
+                } else {
+                    files.add(file);
+                }
+            } else {
+                printErrorBox("File not found: " + arg);
+            }
+        }
+
+        if (files.isEmpty()) {
+            printErrorBox("No valid files provided");
+            return;
+        }
+
+        processFiles(files);
+    }
+
+    private void handleAutoDetectMode(String[] args) {
+        if (args.length < 2) {
+            printErrorBox("Missing directory for -autodetect");
+            return;
+        }
+        String dirPath = args[1];
+        File directory = new File(dirPath);
+        if (!directory.exists() || !directory.isDirectory()) {
+            printErrorBox("Invalid directory for -autodetect: " + dirPath);
+            return;
+        }
+
+        System.out.println("Starting autodetect mode on directory: " + dirPath);
+        while (true) {
+            try {
+                List<File> files = (List<File>) FileUtils.listFiles(directory, null, true);
+
+                if (!files.isEmpty()) {
+                    processFiles(files);
+                }
+            } catch (Exception ignored) {
+            }
+            sleep(3_000);
+        }
     }
 
     private String getCurrentDate() {
@@ -105,6 +146,7 @@ public class DocumentManager {
         } else {
             throw new RuntimeException("Unknown OCR method: " + Config.Props.OCR_METHOD.get());
         }
+        print(ocrText);
         printStep(Config.Props.OCR_METHOD.get() + " OCR", ocrText.length() + " chars", ocrTime.stopFormatted());
 
         final JSONArray exampleFiles = new JSONArray();
@@ -183,8 +225,24 @@ public class DocumentManager {
     }
 
     private static <T> T print(T t) {
-        if (false) System.out.println(t);
+        if (false) {
+            System.out.println(t);
+        } else {
+            try {
+                FileUtils.writeStringToFile(new File("automatic-document-classification-log.txt"), t.toString() + "\n---\n", "UTF-8", true);
+            } catch (IOException ignored) {
+            }
+        }
         return t;
+    }
+
+    private static void sleep(long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException e) {
+            System.out.println("Autodetect mode interrupted. Exiting.");
+            Thread.currentThread().interrupt();
+        }
     }
 
     private static final int TIME_WIDTH = 7;
