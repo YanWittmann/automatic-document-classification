@@ -6,14 +6,18 @@ import de.yanwittmann.document.dir.DirectoryScanner;
 import de.yanwittmann.document.dir.FileMover;
 import de.yanwittmann.document.model.Config;
 import de.yanwittmann.document.model.DFileCategorization;
+import de.yanwittmann.document.model.TimeStats;
 import de.yanwittmann.document.pdf.OCRProcessor;
+import org.apache.commons.io.FileUtils;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.File;
 import java.io.IOException;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -22,6 +26,7 @@ public class DocumentManager {
     private final DirectoryScanner scanner;
     private final CompletionClient aiClient;
     private final FileMover fileMover;
+    private final OCRProcessor ocr = new OCRProcessor();
 
     public DocumentManager() throws IOException {
         this.scanner = new DirectoryScanner(Config.Props.DOCUMENTS_REF_DIR_BASEPATH.get());
@@ -34,30 +39,53 @@ public class DocumentManager {
 
     public static void main(String[] args) throws IOException {
         final DocumentManager documentManager = new DocumentManager();
+        final TimeStats totalTime = new TimeStats();
 
         if (args.length == 0) {
-            System.err.println("No files provided.");
+            printErrorBox("No files provided");
             return;
         }
 
-        for (int i = 0, argsLength = args.length; i < argsLength; i++) {
-            final String filePath = args[i];
-            final File processFile = new File(filePath);
-            System.out.println("[" + (i + 1) + " / " + args.length + "] " + processFile.getName());
+        final List<File> files = new ArrayList<>();
+        for (String arg : args) {
+            final File file = new File(arg);
+            if (file.exists()) {
+                if (file.isDirectory()) {
+                    files.addAll(FileUtils.listFiles(file, null, true));
+                } else {
+                    files.add(file);
+                }
+            } else {
+                printErrorBox("File not found: " + arg);
+            }
+        }
 
-            final DFileCategorization fileCategorization;
+        System.out.printf(String.format("%s - %s - %s%n%n", "DOCUMENT CLASSIFIER", files.size() + " file" + (files.size() == 1 ? "" : "s"), LocalDate.now()));
+
+        for (int i = 0; i < files.size(); i++) {
+            final File processFile = files.get(i);
+            final TimeStats fileTime = new TimeStats();
+
+            printHorizontalLine("┌── " + "[%02d / %02d] ".formatted(i + 1, files.size()));
+            System.out.printf("│ %s%n", processFile.getName());
+
             try {
-                fileCategorization = documentManager.categorizeFile(processFile);
+                final DFileCategorization categorization = documentManager.categorizeFile(processFile);
+                final DFileCategorization finalCategorization = categorization.cleanFilename().retype(processFile.getName());
+
+                // documentManager.fileMover.moveFile(processFile, finalCategorization);
+                printStep("Moved file", finalCategorization.toString(), fileTime.stopFormatted());
             } catch (Exception e) {
-                System.err.println("Error processing " + filePath + ": " + e.getMessage());
+                printErrorBox("Processing failed: " + e.getMessage());
                 e.printStackTrace();
-                continue;
             }
 
-            final DFileCategorization finalFileCategorization = fileCategorization.retype(processFile.getName());
-            System.out.println("[" + (i + 1) + " / " + args.length + "] moving to: " + finalFileCategorization);
-            documentManager.fileMover.moveFile(processFile, finalFileCategorization);
+            printHorizontalLine("└");
         }
+
+        printHorizontalLine("┌");
+        printStep("Finished classification", files.size() + " file" + (files.size() == 1 ? "" : "s") + " processed", totalTime.stopFormatted());
+        printHorizontalLine("└");
     }
 
     private String getCurrentDate() {
@@ -65,8 +93,9 @@ public class DocumentManager {
     }
 
     private DFileCategorization categorizeFile(File file) throws Exception {
-        final OCRProcessor ocr = new OCRProcessor();
+        final TimeStats ocrTime = new TimeStats();
         final String ocrText = ocr.cleanOcrResult(ocr.processFile(file), 2000);
+        printStep("Extracted text", ocrText.length() + " chars", ocrTime.stopFormatted());
 
         final JSONArray exampleFiles = new JSONArray();
         for (Map.Entry<String, DirectoryScanner.DirectoryNode> entry : scanner.getExampleFiles(4).entrySet()) {
@@ -78,35 +107,116 @@ public class DocumentManager {
 
         final Map<String, String> promptParameters = new HashMap<>(Map.of(
                 "ocr_text", ocrText,
-                // "directory_structure", scanner.toJson(3, false).toString(1),
                 "directory_structure", scanner.toShortJson().toString(1),
-                "docfiles", scanner.getNodesWithDocfileContent().stream().map(n -> n.path(true) + " --> " + n.getDocfileContent()).collect(Collectors.joining("\n")),
+                "docfiles", scanner.getNodesWithDocfileContent().stream()
+                        .map(n -> n.path(true) + " --> " + n.getDocfileContent())
+                        .collect(Collectors.joining("\n")),
                 "example_filenames", exampleFiles.toString(1),
                 "current_date", getCurrentDate(),
-                "top_level_directories", new JSONArray(scanner.getTopLevelDirectories().stream().map(DirectoryScanner.DirectoryNode::getName).toList()).toString()
+                "top_level_directories", new JSONArray(scanner.getTopLevelDirectories().stream()
+                        .map(DirectoryScanner.DirectoryNode::getName)
+                        .toList()).toString()
         ));
 
-        {
+        final String ocrSummary;
+        try {
+            final TimeStats summaryTime = new TimeStats();
             final String prompt = print(ChatUtil.fillTemplateFromClasspath("chat/summarize-file-01.txt", promptParameters));
             final String completion = print(ChatUtil.filterThinking(aiClient.generateTextCompletion(prompt)));
-
-            promptParameters.put("ocr_summary", completion);
+            ocrSummary = completion;
+            printStep("Document summarized", ocrSummary.length() + " chars", summaryTime.stopFormatted());
+            promptParameters.put("ocr_summary", ocrSummary);
+        } catch (Exception e) {
+            throw new Exception("Summarization failed: " + e.getMessage(), e);
         }
 
-        {
-            final String prompt = print(ChatUtil.fillTemplateFromClasspath("chat/classify-file-02.txt", promptParameters));
+        final String filename;
+        final TimeStats nameTime = new TimeStats();
+        filename = retry(2, "Filename generation failed", () -> {
+            final String prompt = print(ChatUtil.fillTemplateFromClasspath("chat/generate-filename-01.txt", promptParameters));
             final String completion = print(aiClient.generateTextCompletion(prompt));
-            final JSONObject completionJson = ChatUtil.extractJsonObject(completion);
+            final JSONObject completionJson = print(ChatUtil.extractJsonObject(completion));
+
             if (completionJson == null) {
-                throw new RuntimeException("No valid JSON response found in completion: " + completion.replace("\n", "\\n"));
+                throw new RuntimeException("No valid JSON response: " + completion.replace("\n", "\\n"));
             }
 
-            return DFileCategorization.fromJson(completionJson);
-        }
+            final String extracted = DFileCategorization.fromJson(completionJson).getFilename();
+            if (extracted == null) {
+                throw new RuntimeException("No filename found: " + completion.replace("\n", "\\n"));
+            }
+            return extracted;
+        });
+        printStep("Filename generated", filename, nameTime.stopFormatted());
+        promptParameters.put("suggested_filename", filename);
+
+        final String path;
+        final TimeStats pathTime = new TimeStats();
+        path = retry(2, "Path generation failed", () -> {
+            final String prompt = print(ChatUtil.fillTemplateFromClasspath("chat/suggest-path-01.txt", promptParameters));
+            final String completion = print(aiClient.generateTextCompletion(prompt));
+            final JSONObject completionJson = print(ChatUtil.extractJsonObject(completion));
+
+            if (completionJson == null) {
+                throw new RuntimeException("No valid JSON response: " + completion.replace("\n", "\\n"));
+            }
+
+            final String extracted = DFileCategorization.fromJson(completionJson).getPath();
+            if (extracted == null) {
+                throw new RuntimeException("No path found: " + completion.replace("\n", "\\n"));
+            }
+            return extracted;
+        });
+        printStep("Path generated", path, pathTime.stopFormatted());
+
+        return new DFileCategorization(path, filename);
     }
 
     private static <T> T print(T t) {
         if (false) System.out.println(t);
         return t;
+    }
+
+    private static final int TIME_WIDTH = 7;
+    private static final int ACTION_WIDTH = 20;
+    private static final int DETAILS_WIDTH = 30;
+    private static final int DIVIDER_LINE_LENGTH = 80;
+
+    private static void printStep(String action, String details, String time) {
+        final String timePart = !time.isEmpty() ? String.format("[%" + TIME_WIDTH + "s]", time) : " ".repeat(TIME_WIDTH + 2);
+        final String actionPart = String.format("%-" + ACTION_WIDTH + "s", action + ":");
+        final String detailsPart = String.format("%-" + DETAILS_WIDTH + "s", details);
+
+        System.out.printf("│ %s %s %s%n", timePart, actionPart, detailsPart);
+    }
+
+    private static void printErrorBox(String message) {
+        printHorizontalLine("├");
+        System.out.printf("│ ERROR: %s%n", message);
+        printHorizontalLine("└");
+    }
+
+    private static void printHorizontalLine(String prefix) {
+        System.out.println(prefix + "─".repeat(DIVIDER_LINE_LENGTH - prefix.length() - 1));
+    }
+
+    private static <T> T retry(int times, String failWrapperMessage, ThrowingSupplier<T> supplier) throws Exception {
+        Exception lastException = null;
+        for (int i = 0; i < times; i++) {
+            try {
+                return supplier.get();
+            } catch (Exception e) {
+                System.out.println(" !! Attempt " + (i + 1) + " of " + times + " failed: " + e.getMessage());
+                lastException = e;
+            }
+        }
+        if (lastException == null) {
+            throw new RuntimeException(failWrapperMessage);
+        }
+        throw new RuntimeException(failWrapperMessage + ": " + lastException.getMessage(), lastException);
+    }
+
+    private interface ThrowingSupplier<T> {
+        T get() throws Exception;
     }
 }

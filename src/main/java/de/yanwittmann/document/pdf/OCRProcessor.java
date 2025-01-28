@@ -17,6 +17,8 @@ public class OCRProcessor {
     public String processFile(File inputFile) throws IOException {
         if (isPDF(inputFile)) {
             return processPDF(inputFile);
+        } else if (isImage(inputFile)) {
+            return runTesseractOCR(inputFile);
         } else {
             return FileUtils.readFileToString(inputFile, "UTF-8");
         }
@@ -24,6 +26,11 @@ public class OCRProcessor {
 
     private boolean isPDF(File file) {
         return file.getName().toLowerCase().endsWith(".pdf");
+    }
+
+    private boolean isImage(File file) {
+        final String name = file.getName().toLowerCase();
+        return name.endsWith(".png") || name.endsWith(".jpg") || name.endsWith(".jpeg");
     }
 
     private String processPDF(File pdfFile) throws IOException {

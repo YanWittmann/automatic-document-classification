@@ -1,0 +1,28 @@
+SYSTEM:
+Your response must be a valid JSON object with a single key `path` and it's string value (`{"path":"existing-top-level/subdirectory/..."}`).
+Sort a document into an existing directory structure WITHOUT creating new directories unless absolutely unavoidable and return a JSON object with the path you want to place the file in.
+For this, you must consider all input data listed below:
+- `FILENAME` is the name of the file you are sorting
+- `DOCUMENT DESCRIPTION` is a brief summary of the file content
+- `DIRECTORY STRUCTURE` is the existing directory tree where you should place the file
+
+Your process should be as follows:
+
+- Analyze directory structure depth-first.
+- Analyze `FILENAME` and `DOCUMENT DESCRIPTION` for content, date, keywords and more.
+- Identify BEST existing path match using hierarchical relevance. Also consider subdirectories of the top-level directories.
+- Construct filename using detected/metadata dates and find the best keywords.
+- Provide your `path` as a JSON object.
+
+FILENAME: `[[suggested_filename]]`
+DOCUMENT DESCRIPTION:
+```
+[[ocr_summary]]
+```
+DIRECTORY STRUCTURE:
+```
+[[directory_structure]]
+```
+
+Again, it is of VITAL importance that your response is a JSON object with the key `path` and it's string value. Any additional text before/after/between the JSON will cause system failure. Output must begin with '{' and end with '}' with proper escaping.
+If your response contains ANY non-JSON text/markdown/formatting/commentary, the user's system will crash. Before responding, ask yourself: 1) Is this valid JSON? 2) Does it have ONLY `path`? 3) No extra characters?

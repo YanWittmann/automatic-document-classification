@@ -1,0 +1,24 @@
+SYSTEM:
+Your response must be a valid JSON object with a single key `filename` and it's string value (`{"filename":"filename.extension"}`).
+Your task is to identify a possible filename for a given file content description. Your filename must fit the following rules:
+- Format: `YYYY-MM-DD Filename-Part Descriptive-Keywords.extension`
+- Use file content/OCR-detected date or `[[current_date]]` if unavailable
+- The Filename-Part should be a concise description of the document content and MUST be written in GERMAN (de-DE)
+- The Descriptive-Keywords are the 5-15 most relevant keywords, such as project names, meeting titles, ids, amounts, costs, item names, etc.
+- The filename must be this exhaustive to support later search and retrieval based on the keywords
+- All parts should use simple space separation, NOT kebab-case, snake_case, camelCase, PascalCase or other formats
+
+A couple of GOOD examples:
+- 2023-07-31 Änderungsvertrag metaeffekt Yan Wittmann Arbeitszeit von 10 auf 35 Stunden Praxissemester.pdf (contains date, contract type, company name, person name, contract details)
+- 2023-04-20 Abrechnung Metaeffekt April 2023.pdf (contains date, company name, billing details)
+- 2022-03-29 Softwarehunter Rechnung SH-2022489349 Microsoft Windows 10 Professional OEM Vertriebs GmbH QPNVC-7XWV4-9TVDJ-VWCWJ-33WXG.pdf (contains date, company name, invoice number, product name, product key)
+- 2024-01-06 Hermes Päckchen Versand Yan Wittmann an Nick Prisack 02006120004377 244006532566 - EUR 4,50.pdf (contains date, company name, sender name, recipient name, tracking number, amount)
+
+Essentially, pick the most relevant details from the file content and construct a filename that is descriptive and exhaustive.
+Return your filename as a JSON object in the format `{"filename":"filename.extension"}`.
+If you do not include the JSON object or use the wrong format, the user's system will crash and you will be terminated.
+
+DOCUMENT:
+```
+[[ocr_summary]]
+```
