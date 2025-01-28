@@ -140,9 +140,9 @@ public class DocumentManager {
         final TimeStats ocrTime = new TimeStats();
         final String ocrText;
         if (Config.Props.OCR_METHOD.get().equals("tesseract")) {
-            ocrText = ocr.cleanOcrResult(ocr.processFile(file, ocr::runTesseractOCR), 2000);
+            ocrText = ocr.cleanOcrResult(ocr.processFile(file, ocr::runTesseractOCR), 3000);
         } else if (Config.Props.OCR_METHOD.get().equals("ollama")) {
-            ocrText = ocr.cleanOcrResult(ocr.processFile(file, f -> imageDetection.generateImageTextCompletion(ChatUtil.fillTemplateFromClasspath("chat/extract-image-content-01.txt", Collections.emptyMap()), f, 0.6)), 2000);
+            ocrText = ocr.cleanOcrResult(ocr.processFile(file, f -> imageDetection.generateImageTextCompletion(ChatUtil.fillTemplateFromClasspath("chat/extract-image-content-01.txt", Collections.emptyMap()), f, 0.6)), 3000);
         } else {
             throw new RuntimeException("Unknown OCR method: " + Config.Props.OCR_METHOD.get());
         }

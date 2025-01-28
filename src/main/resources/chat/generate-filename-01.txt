@@ -3,7 +3,7 @@ Your response must be a valid JSON object with a single key `filename` and it's 
 Your task is to identify a possible filename for a given file content description. Your filename must fit the following rules:
 - Format: `YYYY-MM-DD Document-Title Descriptive-Keywords.extension`
 - Use file content/OCR-detected date or `[[current_date]]` if unavailable
-- The Document-Title should be a concise description of the document content and MUST be written in GERMAN (de-DE)
+- The Document-Title should be a concise description of the document content. Use the original language for this. The DOCUMENT content description likely already specifies this title.
 - The Descriptive-Keywords are the 5-15 most relevant keywords, such as product names, project names, meeting titles, ids of any kind, amounts, costs, item names, etc.
 - The filename must be this exhaustive to support later search and retrieval based on the keywords
 - I can't stress this enough: Product, item, and all other names must be included in the filename. The user must be able to find the file based on any of the most important content of the file.

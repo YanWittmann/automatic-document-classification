@@ -3,4 +3,6 @@ MOST IMPORTANTLY: INCLUDE ANY DATES YOU CAN FIND! The next process step will hav
 I cannot stress enough how important it is that you include ALL the dates for the next step to work correctly.
 If you cannot find a specific date, try to find the closest thing in the text content that could be a date. THIS IS IMPORTANT!!!
 End your response with a "Document date: YYYY-MM-DD" or "Document date: cannot find date, but here is the closest thing I found: XYZ", to ensure the next step can work correctly.
+Try to identify the document title in the content and output it as such.
+Also, include the document language and be faithful to the original text.
 OCR_TEXT:
