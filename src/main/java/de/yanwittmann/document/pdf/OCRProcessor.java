@@ -12,13 +12,18 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.function.Function;
 
 public class OCRProcessor {
-    public String processFile(File inputFile) throws IOException {
+    public interface TextExtractor {
+        String apply(File file) throws Exception;
+    }
+
+    public String processFile(File inputFile, TextExtractor textExtractor) throws Exception {
         if (isPDF(inputFile)) {
-            return processPDF(inputFile);
+            return processPDF(inputFile, textExtractor);
         } else if (isImage(inputFile)) {
-            return runTesseractOCR(inputFile);
+            return textExtractor.apply(inputFile);
         } else {
             return FileUtils.readFileToString(inputFile, "UTF-8");
         }
@@ -33,16 +38,16 @@ public class OCRProcessor {
         return name.endsWith(".png") || name.endsWith(".jpg") || name.endsWith(".jpeg");
     }
 
-    private String processPDF(File pdfFile) throws IOException {
+    private String processPDF(File pdfFile, TextExtractor textExtractor) throws Exception {
         try (PDDocument document = Loader.loadPDF(pdfFile)) {
             if (document.getNumberOfPages() > 0) {
-                return extractTextFromPDF(document);
+                return extractTextFromPDF(document, textExtractor);
             }
             return "";
         }
     }
 
-    private String extractTextFromPDF(PDDocument document) throws IOException {
+    private String extractTextFromPDF(PDDocument document, TextExtractor textExtractor) throws Exception {
         PDFRenderer renderer = new PDFRenderer(document);
         Path tempDir = Files.createTempDirectory("pdf_images");
         StringBuilder text = new StringBuilder();
@@ -51,14 +56,14 @@ public class OCRProcessor {
             BufferedImage image = renderer.renderImageWithDPI(i, 300);
             File tempImage = new File(tempDir.toFile(), "page_" + i + ".png");
             ImageIO.write(image, "png", tempImage);
-            text.append(runTesseractOCR(tempImage));
+            text.append(textExtractor.apply(tempImage));
         }
 
         FileUtils.deleteDirectory(tempDir.toFile());
         return text.toString();
     }
 
-    private String runTesseractOCR(File imageFile) throws IOException {
+    public String runTesseractOCR(File imageFile) throws IOException {
         ProcessBuilder pb = new ProcessBuilder(
                 "docker", "run", "--rm",
                 "-v", imageFile.getParent() + ":/data",

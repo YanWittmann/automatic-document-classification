@@ -1,0 +1,1 @@
+Extract all the text from this image in the original language. If there is no text, describe the image in detail.

@@ -15,30 +15,33 @@ import org.json.JSONObject;
 import java.io.File;
 import java.io.IOException;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class DocumentManager {
 
     private final DirectoryScanner scanner;
-    private final CompletionClient aiClient;
+    private final CompletionClient textCompletion;
+    private final CompletionClient imageDetection;
     private final FileMover fileMover;
     private final OCRProcessor ocr = new OCRProcessor();
 
     public DocumentManager() throws IOException {
         this.scanner = new DirectoryScanner(Config.Props.DOCUMENTS_REF_DIR_BASEPATH.get());
-        this.aiClient = CompletionClient.builder()
+        this.textCompletion = CompletionClient.builder()
                 .baseUrl(Config.Props.AI_CHAT_BASEURL.get())
                 .model(Config.Props.AI_CHAT_MODEL.get())
+                .build();
+        this.imageDetection = CompletionClient.builder()
+                .baseUrl(Config.Props.AI_CHAT_BASEURL.get())
+                .model(Config.Props.AI_IMAGE_MODEL.get())
                 .build();
         this.fileMover = new FileMover(Config.Props.DOCUMENTS_MOVE_DIR_BASEPATH.get());
     }
 
     public static void main(String[] args) throws IOException {
         final DocumentManager documentManager = new DocumentManager();
+
         final TimeStats totalTime = new TimeStats();
 
         if (args.length == 0) {
@@ -60,7 +63,7 @@ public class DocumentManager {
             }
         }
 
-        System.out.printf(String.format("%s - %s - %s%n%n", "DOCUMENT CLASSIFIER", files.size() + " file" + (files.size() == 1 ? "" : "s"), LocalDate.now()));
+        System.out.printf(String.format("%s - %s - ocr: %s%n%n", "DOCUMENT CLASSIFIER", files.size() + " file" + (files.size() == 1 ? "" : "s"), Config.Props.OCR_METHOD.get()));
 
         for (int i = 0; i < files.size(); i++) {
             final File processFile = files.get(i);
@@ -94,8 +97,15 @@ public class DocumentManager {
 
     private DFileCategorization categorizeFile(File file) throws Exception {
         final TimeStats ocrTime = new TimeStats();
-        final String ocrText = ocr.cleanOcrResult(ocr.processFile(file), 2000);
-        printStep("Extracted text", ocrText.length() + " chars", ocrTime.stopFormatted());
+        final String ocrText;
+        if (Config.Props.OCR_METHOD.get().equals("tesseract")) {
+            ocrText = ocr.cleanOcrResult(ocr.processFile(file, ocr::runTesseractOCR), 2000);
+        } else if (Config.Props.OCR_METHOD.get().equals("ollama")) {
+            ocrText = ocr.cleanOcrResult(ocr.processFile(file, f -> imageDetection.generateImageTextCompletion(ChatUtil.fillTemplateFromClasspath("chat/extract-image-content-01.txt", Collections.emptyMap()), f, 0.6)), 2000);
+        } else {
+            throw new RuntimeException("Unknown OCR method: " + Config.Props.OCR_METHOD.get());
+        }
+        printStep(Config.Props.OCR_METHOD.get() + " OCR", ocrText.length() + " chars", ocrTime.stopFormatted());
 
         final JSONArray exampleFiles = new JSONArray();
         for (Map.Entry<String, DirectoryScanner.DirectoryNode> entry : scanner.getExampleFiles(4).entrySet()) {
@@ -122,7 +132,7 @@ public class DocumentManager {
         try {
             final TimeStats summaryTime = new TimeStats();
             final String prompt = print(ChatUtil.fillTemplateFromClasspath("chat/summarize-file-01.txt", promptParameters));
-            final String completion = print(ChatUtil.filterThinking(aiClient.generateTextCompletion(prompt)));
+            final String completion = print(ChatUtil.filterThinking(textCompletion.generateTextCompletion(prompt)));
             ocrSummary = completion;
             printStep("Document summarized", ocrSummary.length() + " chars", summaryTime.stopFormatted());
             promptParameters.put("ocr_summary", ocrSummary);
@@ -134,16 +144,16 @@ public class DocumentManager {
         final TimeStats nameTime = new TimeStats();
         filename = retry(2, "Filename generation failed", () -> {
             final String prompt = print(ChatUtil.fillTemplateFromClasspath("chat/generate-filename-01.txt", promptParameters));
-            final String completion = print(aiClient.generateTextCompletion(prompt));
+            final String completion = print(textCompletion.generateTextCompletion(prompt));
             final JSONObject completionJson = print(ChatUtil.extractJsonObject(completion));
 
             if (completionJson == null) {
-                throw new RuntimeException("No valid JSON response: " + completion.replace("\n", "\\n"));
+                throw new RuntimeException("No valid JSON response for filename generation.");
             }
 
             final String extracted = DFileCategorization.fromJson(completionJson).getFilename();
             if (extracted == null) {
-                throw new RuntimeException("No filename found: " + completion.replace("\n", "\\n"));
+                throw new RuntimeException("No filename found in response JSON.");
             }
             return extracted;
         });
@@ -154,16 +164,16 @@ public class DocumentManager {
         final TimeStats pathTime = new TimeStats();
         path = retry(2, "Path generation failed", () -> {
             final String prompt = print(ChatUtil.fillTemplateFromClasspath("chat/suggest-path-01.txt", promptParameters));
-            final String completion = print(aiClient.generateTextCompletion(prompt));
+            final String completion = print(textCompletion.generateTextCompletion(prompt));
             final JSONObject completionJson = print(ChatUtil.extractJsonObject(completion));
 
             if (completionJson == null) {
-                throw new RuntimeException("No valid JSON response: " + completion.replace("\n", "\\n"));
+                throw new RuntimeException("No valid JSON response for path generation.");
             }
 
             final String extracted = DFileCategorization.fromJson(completionJson).getPath();
             if (extracted == null) {
-                throw new RuntimeException("No path found: " + completion.replace("\n", "\\n"));
+                throw new RuntimeException("No path found in response JSON.");
             }
             return extracted;
         });
@@ -200,13 +210,13 @@ public class DocumentManager {
         System.out.println(prefix + "─".repeat(DIVIDER_LINE_LENGTH - prefix.length() - 1));
     }
 
-    private static <T> T retry(int times, String failWrapperMessage, ThrowingSupplier<T> supplier) throws Exception {
+    private static <T> T retry(int times, String failWrapperMessage, ThrowingSupplier<T> supplier) {
         Exception lastException = null;
         for (int i = 0; i < times; i++) {
             try {
                 return supplier.get();
             } catch (Exception e) {
-                System.out.println(" !! Attempt " + (i + 1) + " of " + times + " failed: " + e.getMessage());
+                System.out.println("│ Attempt " + (i + 1) + " of " + times + " failed: " + e.getMessage());
                 lastException = e;
             }
         }

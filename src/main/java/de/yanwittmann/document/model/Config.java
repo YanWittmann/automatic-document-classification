@@ -31,10 +31,12 @@ public abstract class Config {
     @AllArgsConstructor
     public enum Props {
         AI_CHAT_MODEL("ai.chat.model", "llama3:8b"),
+        AI_IMAGE_MODEL("ai.image.model", "llama3.2-vision"),
         AI_CHAT_BASEURL("ai.chat.baseurl", "http://localhost:11434"),
         DOCUMENTS_REF_DIR_BASEPATH("documents.refdir.basepath", null),
         DOCUMENTS_MOVE_DIR_BASEPATH("documents.movedir.basepath", null),
-        OCR_LANGUAGE("ocr.language", "eng")
+        OCR_LANGUAGE("ocr.language", "eng"),
+        OCR_METHOD("ocr.method", "ollama"),
         ;
 
         private final String key;
