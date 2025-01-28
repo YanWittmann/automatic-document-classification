@@ -63,7 +63,7 @@ public class DocumentManager {
             }
         }
 
-        System.out.printf(String.format("%s - %s - ocr: %s%n%n", "DOCUMENT CLASSIFIER", files.size() + " file" + (files.size() == 1 ? "" : "s"), Config.Props.OCR_METHOD.get()));
+        System.out.printf(String.format("%s - %s - ocr=%s%n%n", "DOCUMENT CLASSIFIER", files.size() + " file" + (files.size() == 1 ? "" : "s"), Config.Props.OCR_METHOD.get()));
 
         for (int i = 0; i < files.size(); i++) {
             final File processFile = files.get(i);
@@ -76,7 +76,7 @@ public class DocumentManager {
                 final DFileCategorization categorization = documentManager.categorizeFile(processFile);
                 final DFileCategorization finalCategorization = categorization.cleanFilename().retype(processFile.getName());
 
-                // documentManager.fileMover.moveFile(processFile, finalCategorization);
+                documentManager.fileMover.moveFile(processFile, finalCategorization);
                 printStep("Moved file", finalCategorization.toString(), fileTime.stopFormatted());
             } catch (Exception e) {
                 printErrorBox("Processing failed: " + e.getMessage());

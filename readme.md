@@ -27,7 +27,7 @@ Automatically rename and move documents to a folder structure based on their con
     - Directory structure validation and creation
     - Clean filename generation with special character removal
 
-I achieved processing times of roughly one document per minute, on my NVIDIA GeForce RTX 3090,
+I achieved processing times of roughly 90-100 seconds per document (tesseract OCR) on my NVIDIA GeForce RTX 3090,
 using with the `deepseek-r1` model.
 I can't scan and sort my documents physically very much faster than that, so I'm happy with the performance.
 This long processing time comes from the three different steps I split the process into.
@@ -36,22 +36,23 @@ I couldn't get the results I wanted with fewer prompts.
 The tesseract OCR is MUCH cheaper than the AI, but the AI is much more accurate.
 As usual, trade-offs.
 You can configure the tool to use either one via the `ocr.method` property in the config file.
+One of the most important parts for me is the automatic date extraction from the document content.
 
 Example output:
 
 ```bash
-DOCUMENT CLASSIFIER - 1 file - 2025-01-28
+DOCUMENT CLASSIFIER - 1 file - ocr=ollama
 
 ┌── [01 / 01] ─────────────────────────────────────────────────────────────────
 │ IMG_20250128_0001.pdf
-│ [  2.95s] Extracted text:      519 chars
-│ [ 48.13s] Document summarized: 1189 chars
-│ [ 19.68s] Filename generated:  2024-12-30 Kassenbeleg DEICHMANN SE 0000154301000 EUR 20,98.pdf
-│ [ 20.37s] Path generated:      05 Rechnungen, Angebote/Rechnungen
-│ [ 91.16s] Moved file:          05 Rechnungen, Angebote/Rechnungen/2024-12-30 Kassenbeleg DEICHMANN SE 0000154301000 EUR 2098.pdf
+│ [ 18.13s] ollama OCR:          1160 chars
+│ [ 51.89s] Document summarized: 1061 chars
+│ [ 18.65s] Filename generated:  2024-12-30 Rechnung Deichmann DE119663402 Girocard Björndal 17,63€ pro Stck 20,98€ Gesamt.pdf
+│ [ 15.93s] Path generated:      05 Rechnungen, Angebote/Rechnungen
+│ [104.63s] Moved file:          05 Rechnungen, Angebote/Rechnungen/2024-12-30 Rechnung Deichmann DE119663402 Girocard Björndal 17,63€ pro Stck 20,98€ Gesamt.pdf
 └──────────────────────────────────────────────────────────────────────────────
 ┌──────────────────────────────────────────────────────────────────────────────
-│ [ 91.18s] Finished classification: 1 file processed
+│ [104.64s] Finished classification: 1 file processed
 └──────────────────────────────────────────────────────────────────────────────
 ```
 
